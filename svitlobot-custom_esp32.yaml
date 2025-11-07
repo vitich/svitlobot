@@ -83,7 +83,7 @@ script:
           then:
             - globals.set:
                 id: svitlobot_session
-                value: '1'
+                value: true
             - http_request.get:
                 url: !lambda |-
                   return ((std::string) "http://api.svitlobot.in.ua/channelPing?channel_key=" + id(svitlobot_key).state).c_str();
@@ -109,7 +109,7 @@ script:
           then:
             - globals.set:
                 id: url1_session
-                value: '1'
+                value: true
             - http_request.get:
                 url: !lambda 'return id(url1_key).state.c_str();'
                 on_response:
@@ -134,7 +134,7 @@ script:
           then:
             - globals.set:
                 id: url2_session
-                value: '1'
+                value: true
             - http_request.get:
                 url: !lambda 'return id(url2_key).state.c_str();'
                 on_response:
