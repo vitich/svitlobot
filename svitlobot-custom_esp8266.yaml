@@ -46,250 +46,156 @@ http_request:
   timeout: 2s
 
 globals:
-  # URL1
-  - id: url1_send_quality
-    type: int
-    restore_value: no
-    initial_value: '-1'
-
-  - id: url1_session
-    type: bool
-    restore_value: no
-    initial_value: 'false'
-
-  # URL2
-  - id: url2_send_quality
-    type: int
-    restore_value: no
-    initial_value: '-1'
-
-  - id: url2_session
-    type: bool
-    restore_value: no
-    initial_value: 'false'
-
-  # SvitloBot
   - id: svitlobot_send_quality
     type: int
     restore_value: no
     initial_value: '-1'
-
   - id: svitlobot_session
-    type: bool
+    type: int
     restore_value: no
-    initial_value: 'false'
+    initial_value: '0'
+
+  - id: url1_send_quality
+    type: int
+    restore_value: no
+    initial_value: '-1'
+  - id: url1_session
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  - id: url2_send_quality
+    type: int
+    restore_value: no
+    initial_value: '-1'
+  - id: url2_session
+    type: int
+    restore_value: no
+    initial_value: '0'
 
 script:
-  # URL1
-  - id: url1_send_state
-    then:
-      - if:
-          condition:
-            and:
-              - wifi.connected:
-              - lambda: 'return id(url1_key).has_state();'
-          then:
-            - globals.set:
-                id: url1_session
-                value: 'true'
-            - http_request.get:
-                url: !lambda |-
-                  return id(url1_key).state.c_str();
-                on_response:
-                  then:
-                    - lambda: id(url1_set_state)->execute(response->status_code, "");
-                    - globals.set:
-                        id: url1_session
-                        value: 'false'
-            - if:
-                condition:
-                  lambda: 'return id(url1_session);'
-                then:
-                  - script.execute:
-                      id: url1_set_state
-                      code: -1
-                      response: ""
-            - component.update: url1_quality
-    mode: queued
-
-  - id: url1_set_state
+  - id: send_to_svitlobot
     parameters:
-      code: int
-      response: string
-    then:
-      - lambda: |-
-          if (code == 200)
-          {
-            ESP_LOGD("URL1", "Send status - success");
-            id(url1_send_status).publish_state(true);
-            id(url1_send_quality) = id(url1_send_quality) < 0 ? 100 : std::min(100, ++id(url1_send_quality));
-          }
-          else
-          {
-            if (code > 0)
-            {
-              ESP_LOGE("URL1", "Send status - not success with response code: %d", code);
-            }
-            id(url1_send_status).publish_state(false);
-            id(url1_send_quality) = id(url1_send_quality) < 0 ? 0 : std::max(0, --id(url1_send_quality));
-          }
-    mode: queued
-
-  # URL2
-  - id: url2_send_state
+      retries: int
     then:
       - if:
           condition:
-            and:
-              - wifi.connected:
-              - lambda: 'return id(url2_key).has_state();'
-          then:
-            - globals.set:
-                id: url2_session
-                value: 'true'
-            - http_request.get:
-                url: !lambda |-
-                  return id(url2_key).state.c_str();
-                on_response:
-                  then:
-                    - lambda: id(url2_set_state)->execute(response->status_code, "");
-                    - globals.set:
-                        id: url2_session
-                        value: 'false'
-            - if:
-                condition:
-                  lambda: 'return id(url2_session);'
-                then:
-                  - script.execute:
-                      id: url2_set_state
-                      code: -1
-                      response: ""
-            - component.update: url2_quality
-    mode: queued
-
-  - id: url2_set_state
-    parameters:
-      code: int
-      response: string
-    then:
-      - lambda: |-
-          if (code == 200)
-          {
-            ESP_LOGD("URL2", "Send status - success");
-            id(url2_send_status).publish_state(true);
-            id(url2_send_quality) = id(url2_send_quality) < 0 ? 100 : std::min(100, ++id(url2_send_quality));
-          }
-          else
-          {
-            if (code > 0)
-            {
-              ESP_LOGE("URL2", "Send status - not success with response code: %d", code);
-            }
-            id(url2_send_status).publish_state(false);
-            id(url2_send_quality) = id(url2_send_quality) < 0 ? 0 : std::max(0, --id(url2_send_quality));
-          }
-    mode: queued
-
-  # SvitloBot
-  - id: svitlobot_send_state
-    then:
-      - if:
-          condition:
-            and:
-              - wifi.connected:
-              - lambda: 'return id(svitlobot_key).has_state();'
+            lambda: 'return id(svitlobot_session) == 0 && wifi.connected && id(svitlobot_key).has_state();'
           then:
             - globals.set:
                 id: svitlobot_session
-                value: 'true'
+                value: 1
             - http_request.get:
                 url: !lambda |-
                   return ((std::string) "http://api.svitlobot.in.ua/channelPing?channel_key=" + id(svitlobot_key).state).c_str();
                 on_response:
                   then:
-                    - lambda: id(svitlobot_set_state)->execute(response->status_code, "");
-                    - globals.set:
-                        id: svitlobot_session
-                        value: 'false'
-            - if:
-                condition:
-                  lambda: 'return id(svitlobot_session);'
-                then:
-                  - script.execute:
-                      id: svitlobot_set_state
-                      code: -1
-                      response: ""
-            - component.update: svitlobot_quality
-    mode: queued
+                    - lambda: |-
+                        int code = response->status_code;
+                        if (code == 200) {
+                          id(svitlobot_send_quality) = id(svitlobot_send_quality) < 0 ? 100 : std::min(100, ++id(svitlobot_send_quality));
+                        } else {
+                          id(svitlobot_send_quality) = id(svitlobot_send_quality) < 0 ? 0 : std::max(0, --id(svitlobot_send_quality));
+                          if (retries < 3) id(send_to_svitlobot).execute(retries + 1);
+                        }
+                        id(svitlobot_session) = 0;
 
-  - id: svitlobot_set_state
+  - id: send_to_url1
     parameters:
-      code: int
-      response: string
+      retries: int
     then:
-      - lambda: |-
-          if (code == 200)
-          {
-            ESP_LOGD("SvitloBot", "Send status - success");
-            id(svitlobot_send_status).publish_state(true);
-            id(svitlobot_send_quality) = id(svitlobot_send_quality) < 0 ? 100 : std::min(100, ++id(svitlobot_send_quality));
-          }
-          else
-          {
-            if (code > 0)
-            {
-              ESP_LOGE("SvitloBot", "Send status - not success with response code: %d", code);
-            }
-            id(svitlobot_send_status).publish_state(false);
-            id(svitlobot_send_quality) = id(svitlobot_send_quality) < 0 ? 0 : std::max(0, --id(svitlobot_send_quality));
-          }
-    mode: queued
+      - if:
+          condition:
+            lambda: 'return id(url1_session) == 0 && wifi.connected && id(url1_key).has_state();'
+          then:
+            - globals.set:
+                id: url1_session
+                value: 1
+            - http_request.get:
+                url: !lambda 'return id(url1_key).state.c_str();'
+                on_response:
+                  then:
+                    - lambda: |-
+                        int code = response->status_code;
+                        if (code == 200) {
+                          id(url1_send_quality) = id(url1_send_quality) < 0 ? 100 : std::min(100, ++id(url1_send_quality));
+                        } else {
+                          id(url1_send_quality) = id(url1_send_quality) < 0 ? 0 : std::max(0, --id(url1_send_quality));
+                          if (retries < 3) id(send_to_url1).execute(retries + 1);
+                        }
+                        id(url1_session) = 0;
+
+  - id: send_to_url2
+    parameters:
+      retries: int
+    then:
+      - if:
+          condition:
+            lambda: 'return id(url2_session) == 0 && wifi.connected && id(url2_key).has_state();'
+          then:
+            - globals.set:
+                id: url2_session
+                value: 1
+            - http_request.get:
+                url: !lambda 'return id(url2_key).state.c_str();'
+                on_response:
+                  then:
+                    - lambda: |-
+                        int code = response->status_code;
+                        if (code == 200) {
+                          id(url2_send_quality) = id(url2_send_quality) < 0 ? 100 : std::min(100, ++id(url2_send_quality));
+                        } else {
+                          id(url2_send_quality) = id(url2_send_quality) < 0 ? 0 : std::max(0, --id(url2_send_quality));
+                          if (retries < 3) id(send_to_url2).execute(retries + 1);
+                        }
+                        id(url2_session) = 0;
 
 interval:
   - interval: 1min
     then:
-      - script.execute: url1_send_state
-      - script.execute: url2_send_state
-      - script.execute: svitlobot_send_state
+      - script.execute:
+          id: send_to_svitlobot
+          retries: 0
+      - script.execute:
+          id: send_to_url1
+          retries: 0
+      - script.execute:
+          id: send_to_url2
+          retries: 0
 
 text:
-  - platform: template
-    name: "URL1 (http not https)"
-    id: url1_key
-    optimistic: true
-    min_length: 0
-    max_length: 120
-    mode: text
-    restore_value: true
-    icon: mdi:link-variant
-    entity_category: config
-    disabled_by_default: true
-
-  - platform: template
-    name: "URL2 (http not https)"
-    id: url2_key
-    optimistic: true
-    min_length: 0
-    max_length: 120
-    mode: text
-    restore_value: true
-    icon: mdi:link-variant
-    entity_category: config
-    disabled_by_default: true
-
   - platform: template
     name: "SvitloBot Key"
     id: svitlobot_key
     optimistic: true
     min_length: 0
     max_length: 15
-    mode: text
     restore_value: true
     icon: mdi:key-chain-variant
-    entity_category: config
-    disabled_by_default: true
+
+  - platform: template
+    name: "URL1 (http)"
+    id: url1_key
+    optimistic: true
+    min_length: 0
+    max_length: 120
+    restore_value: true
+    icon: mdi:link-variant
+
+  - platform: template
+    name: "URL2 (http)"
+    id: url2_key
+    optimistic: true
+    min_length: 0
+    max_length: 120
+    restore_value: true
+    icon: mdi:link-variant
 
 binary_sensor:
+  - platform: template
+    name: "SvitloBot Status"
+    id: svitlobot_send_status
+    icon: mdi:lan-connect
   - platform: template
     name: "URL1 Status"
     id: url1_send_status
@@ -298,21 +204,21 @@ binary_sensor:
     name: "URL2 Status"
     id: url2_send_status
     icon: mdi:lan-connect
-  - platform: template
-    name: "SvitloBot Status"
-    id: svitlobot_send_status
-    icon: mdi:lan-connect
 
 sensor:
   - platform: template
+    name: "SvitloBot Delivery Quality"
+    id: svitlobot_quality
+    lambda: 'return id(svitlobot_send_quality) < 0 ? NAN : id(svitlobot_send_quality);'
+    accuracy_decimals: 0
+    unit_of_measurement: "%"
+    icon: mdi:wan
+    state_class: measurement
+
+  - platform: template
     name: "URL1 Delivery Quality"
     id: url1_quality
-    lambda: |-
-      if (!id(url1_key).has_state() || id(url1_send_quality) < 0)
-      {
-        return NAN;
-      }
-      return id(url1_send_quality);
+    lambda: 'return id(url1_send_quality) < 0 ? NAN : id(url1_send_quality);'
     accuracy_decimals: 0
     unit_of_measurement: "%"
     icon: mdi:wan
@@ -321,26 +227,7 @@ sensor:
   - platform: template
     name: "URL2 Delivery Quality"
     id: url2_quality
-    lambda: |-
-      if (!id(url2_key).has_state() || id(url2_send_quality) < 0)
-      {
-        return NAN;
-      }
-      return id(url2_send_quality);
-    accuracy_decimals: 0
-    unit_of_measurement: "%"
-    icon: mdi:wan
-    state_class: measurement
-
-  - platform: template
-    name: "SvitloBot Delivery Quality"
-    id: svitlobot_quality
-    lambda: |-
-      if (!id(svitlobot_key).has_state() || id(svitlobot_send_quality) < 0)
-      {
-        return NAN;
-      }
-      return id(svitlobot_send_quality);
+    lambda: 'return id(url2_send_quality) < 0 ? NAN : id(url2_send_quality);'
     accuracy_decimals: 0
     unit_of_measurement: "%"
     icon: mdi:wan
