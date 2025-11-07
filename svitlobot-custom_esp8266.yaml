@@ -167,6 +167,7 @@ text:
   - platform: template
     name: "SvitloBot Key"
     id: svitlobot_key
+    mode: text
     optimistic: true
     min_length: 0
     max_length: 15
@@ -176,6 +177,7 @@ text:
   - platform: template
     name: "URL1 (http)"
     id: url1_key
+    mode: text
     optimistic: true
     min_length: 0
     max_length: 120
@@ -185,6 +187,7 @@ text:
   - platform: template
     name: "URL2 (http)"
     id: url2_key
+    mode: text
     optimistic: true
     min_length: 0
     max_length: 120
